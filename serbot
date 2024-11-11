@@ -1,0 +1,103 @@
+#include <SPI.h>
+#include <RF24.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define TRIG_PIN 3
+#define ECHO_PIN 4
+
+// LED pins
+#define LED1_PIN 5
+#define LED2_PIN 6
+#define LED3_PIN 7
+
+// Buzzer pin
+#define BUZZER_PIN 8
+
+// Distance threshold in cm
+#define DISTANCE_THRESHOLD 3
+
+// LCD setup (use your I2C address; typically 0x27 or 0x3F)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// NRF24L01 setup
+RF24 radio(9, 10);  // CE, CSN
+const byte address[6] = "00001";
+
+long duration;
+int distance;
+
+void setup() {
+  Serial.begin(9600);
+
+  // LCD setup
+  lcd.begin(16, 2);
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Distance:");
+
+  // NRF24L01 setup
+  radio.begin();
+  radio.openWritingPipe(address);
+  radio.setPALevel(RF24_PA_LOW);
+  radio.stopListening();
+
+  // HC-SR04 setup
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  // LED setup
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+
+  // Buzzer setup
+  pinMode(BUZZER_PIN, OUTPUT);
+}
+
+void loop() {
+  // Read distance from HC-SR04
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  duration = pulseIn(ECHO_PIN, HIGH);
+  distance = duration * 0.034 / 2;
+
+  // Display distance on LCD
+  lcd.setCursor(0, 1);
+  lcd.print("Dist: ");
+  lcd.print(distance);
+  lcd.print(" cm    ");
+
+  // Send distance data via NRF24L01
+  radio.write(&distance, sizeof(distance));
+
+  // Check distance threshold
+  if (distance > DISTANCE_THRESHOLD) {
+    // Turn on all LEDs and sound the buzzer
+    digitalWrite(LED1_PIN, HIGH);
+    digitalWrite(LED2_PIN, HIGH);
+    digitalWrite(LED3_PIN, HIGH);
+    digitalWrite(BUZZER_PIN, HIGH);
+  } else {
+    // Run the original LED sequence and turn off the buzzer
+    digitalWrite(BUZZER_PIN, LOW);
+
+    // LED sequence with delay
+    digitalWrite(LED1_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED1_PIN, LOW);
+
+    digitalWrite(LED2_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED2_PIN, LOW);
+
+    digitalWrite(LED3_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED3_PIN, LOW);
+  }
+
+  // Wait a bit before the next reading
+}
